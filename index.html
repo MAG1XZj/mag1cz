@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Artist Dodge</title>
+<style>
+  :root {
+    --bg: #0f1012; --panel: #1a1c20; --panel2: #23262b; --text: #f2f3f5; --muted: #9aa0a8;
+    --accent: #1ed760; --accent-ink: #06210f; --danger: #ff4d5e; --border: #2e3238;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h1 span { color: var(--accent); }
+  h2 { font-size: 20px; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+  input[type=text], input[type=search], textarea {
+    width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text); font: inherit;
+  }
+  textarea { min-height: 160px; resize: vertical; font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+  input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button {
+    font: inherit; font-weight: 600; border: 0; border-radius: 999px; padding: 12px 22px; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink);
+  }
+  button.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .row > input { flex: 1 1 260px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .tabs button { background: var(--panel2); color: var(--muted); padding: 8px 16px; font-size: 14px; }
+  .tabs button.on { background: var(--text); color: var(--bg); }
+  .hint { font-size: 13px; color: var(--muted); }
+  .hint code { background: var(--panel2); padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  details ol { padding-left: 20px; font-size: 14px; color: var(--muted); }
+  .err { color: var(--danger); font-size: 14px; min-height: 1em; margin-top: 10px; }
+  .hidden { display: none !important; }
+
+  .artists { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; max-height: 380px; overflow-y: auto; margin-top: 12px; padding-right: 4px; }
+  .artist { text-align: left; background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-weight: 500; }
+  .artist small { display: block; color: var(--muted); font-weight: 400; }
+  .artist.on { border-color: var(--accent); background: #173322; }
+
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .big { font-size: 40px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .odds { font-size: 14px; color: var(--muted); }
+
+  .progress { height: 10px; background: var(--panel2); border-radius: 999px; overflow: hidden; margin: 8px 0 20px; }
+  .progress div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+  .song { display: flex; gap: 16px; align-items: center; }
+  .song img, .song .noart { width: 96px; height: 96px; border-radius: 8px; object-fit: cover; background: var(--panel2); flex: none; }
+  .song .title { font-size: 20px; font-weight: 700; }
+  .song .by { color: var(--muted); }
+  .song .by b { color: var(--danger); }
+  .embed { margin-top: 16px; }
+  .embed iframe { width: 100%; height: 80px; border: 0; border-radius: 12px; }
+  .banner { border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 16px; }
+  .banner.win { background: #173322; border: 1px solid var(--accent); }
+  .banner.lose { background: #3a1419; border: 1px solid var(--danger); }
+  .banner .big { font-size: 34px; }
+  .history { list-style: none; padding: 0; margin: 0; font-size: 14px; }
+  .history li { padding: 6px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .history li.hit { color: var(--danger); font-weight: 600; }
+  @media (max-width: 480px) { .song img, .song .noart { width: 72px; height: 72px; } .big { font-size: 32px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Artist <span>Dodge</span></h1>
+  <p class="sub">Pick an artist from your playlist. Survive the shuffle without hearing them.</p>
+
+  <!-- STEP 1: load songs -->
+  <section id="step-load">
+    <div class="tabs">
+      <button id="tab-spotify" class="on">Spotify link</button>
+      <button id="tab-manual">Paste songs</button>
+    </div>
+
+    <div id="pane-spotify" class="panel">
+      <label for="playlist-url">Spotify playlist link</label>
+      <div class="row">
+        <input id="playlist-url" type="text" placeholder="https://open.spotify.com/playlist/...">
+        <button id="load-btn">Scan playlist</button>
+      </div>
+      <div id="load-err" class="err"></div>
+
+      <details id="setup" style="margin-top:14px">
+        <summary>Spotify setup (one time) — <span id="setup-status">not connected</span></summary>
+        <ol>
+          <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="color:var(--accent)">developer.spotify.com/dashboard</a> and create an app (select “Web API”).</li>
+          <li>Add this exact Redirect URI to the app: <code id="redirect-uri"></code></li>
+          <li>Copy the app's Client ID and paste it below.</li>
+        </ol>
+        <label for="client-id">Client ID</label>
+        <div class="row">
+          <input id="client-id" type="text" placeholder="32-character Client ID">
+          <button id="logout-btn" class="ghost">Disconnect</button>
+        </div>
+        <p class="hint">Spotify only allows redirect URIs on <code>https://</code> or <code>http://127.0.0.1</code> (not “localhost”).</p>
+      </details>
+    </div>
+
+    <div id="pane-manual" class="panel hidden">
+      <label for="manual">One song per line: <code>Artist - Title</code>. Separate multiple artists with commas.</label>
+      <textarea id="manual" placeholder="Drake, Future - Life Is Good&#10;Taylor Swift - Anti-Hero&#10;Kendrick Lamar - HUMBLE."></textarea>
+      <div class="row" style="margin-top:12px">
+        <button id="manual-btn">Use these songs</button>
+      </div>
+      <div id="manual-err" class="err"></div>
+    </div>
+  </section>
+
+  <!-- STEP 2: choose artist + target -->
+  <section id="step-pick" class="hidden">
+    <div class="panel">
+      <h2 id="pl-name">Playlist</h2>
+      <p class="hint" id="pl-stats"></p>
+      <input id="artist-search" type="search" placeholder="Search artists…">
+      <div id="artists" class="artists"></div>
+    </div>
+
+    <div id="target-panel" class="panel hidden">
+      <label>Avoid <b id="chosen-name" style="color:var(--text)"></b> for how many songs?</label>
+      <div class="big" id="target-val">5</div>
+      <input id="target" type="range" min="1" max="10" value="5">
+      <p class="odds" id="odds"></p>
+      <div class="row">
+        <button id="play-btn">▶ Play</button>
+        <button id="back-load" class="ghost">New playlist</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3: game -->
+  <section id="step-game" class="hidden">
+    <div id="banner" class="banner hidden"></div>
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <div>Avoiding <b id="g-artist"></b></div>
+        <div class="hint" id="g-count"></div>
+      </div>
+      <div class="progress"><div id="g-bar"></div></div>
+
+      <div id="song" class="song"></div>
+      <div id="embed" class="embed"></div>
+
+      <div class="row" style="margin-top:20px">
+        <button id="next-btn">Next song ⏭</button>
+        <button id="again-btn" class="hidden">Play again</button>
+        <button id="change-btn" class="ghost">Change artist</button>
+        <label class="hint" style="margin:0;display:flex;gap:6px;align-items:center">
+          <input type="checkbox" id="embed-toggle" checked> Spotify player
+        </label>
+      </div>
+    </div>
+    <div class="panel">
+      <h2 style="font-size:16px">Played so far</h2>
+      <ol id="history" class="history"></ol>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+    del(k) { try { localStorage.removeItem(k); } catch {} },
+  };
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  const REDIRECT_URI = location.origin + location.pathname;
+  const SCOPES = "playlist-read-private playlist-read-collaborative";
+
+  // Songs: [{ id, title, artists: [name], art, uri }]
+  let songs = [];
+  let playlistName = "";
+  let chosenArtist = null;
+  let game = null; // { deck, pos, target, survived, over, history }
+
+  // ---------- screens ----------
+  function show(step) {
+    for (const s of ["step-load", "step-pick", "step-game"]) $(s).classList.toggle("hidden", s !== step);
+    window.scrollTo(0, 0);
+  }
+
+  $("tab-spotify").onclick = () => setTab("spotify");
+  $("tab-manual").onclick = () => setTab("manual");
+  function setTab(t) {
+    $("tab-spotify").classList.toggle("on", t === "spotify");
+    $("tab-manual").classList.toggle("on", t === "manual");
+    $("pane-spotify").classList.toggle("hidden", t !== "spotify");
+    $("pane-manual").classList.toggle("hidden", t !== "manual");
+  }
+
+  // ---------- Spotify auth (PKCE, no server needed) ----------
+  $("redirect-uri").textContent = REDIRECT_URI;
+  $("client-id").value = store.get("ad_client_id") || "";
+  $("client-id").oninput = (e) => store.set("ad_client_id", e.target.value.trim());
+
+  function token() {
+    const t = store.get("ad_token"), exp = Number(store.get("ad_token_exp") || 0);
+    return t && Date.now() < exp ? t : null;
+  }
+  function refreshStatus() {
+    $("setup-status").textContent = token() ? "connected ✓" : "not connected";
+  }
+  $("logout-btn").onclick = () => { store.del("ad_token"); store.del("ad_token_exp"); store.del("ad_refresh"); refreshStatus(); };
+
+  const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+  async function login() {
+    const clientId = $("client-id").value.trim();
+    if (!clientId) {
+      $("setup").open = true;
+      throw new Error("First time? Open “Spotify setup” below and paste your Client ID.");
+    }
+    if (!crypto.subtle) throw new Error("This page must be served over https:// or http://127.0.0.1 to log in to Spotify.");
+    const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+    const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+    store.set("ad_verifier", verifier);
+    const q = new URLSearchParams({
+      client_id: clientId, response_type: "code", redirect_uri: REDIRECT_URI,
+      code_challenge_method: "S256", code_challenge: challenge, scope: SCOPES,
+    });
+    location.href = "https://accounts.spotify.com/authorize?" + q;
+  }
+
+  function saveToken(data) {
+    store.set("ad_token", data.access_token);
+    store.set("ad_token_exp", String(Date.now() + (data.expires_in - 60) * 1000));
+    if (data.refresh_token) store.set("ad_refresh", data.refresh_token);
+  }
+
+  async function tokenRequest(params) {
+    const res = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: store.get("ad_client_id") || "", ...params }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error("Spotify login failed: " + (data.error_description || data.error || res.status));
+    saveToken(data);
+  }
+
+  async function ensureToken() {
+    if (token()) return token();
+    const refresh = store.get("ad_refresh");
+    if (refresh) {
+      try { await tokenRequest({ grant_type: "refresh_token", refresh_token: refresh }); return token(); }
+      catch { store.del("ad_refresh"); }
+    }
+    return null;
+  }
+
+  async function handleRedirect() {
+    const p = new URLSearchParams(location.search);
+    if (!p.has("code") && !p.has("error")) return;
+    history.replaceState(null, "", REDIRECT_URI);
+    if (p.has("error")) throw new Error("Spotify login was cancelled (" + p.get("error") + ").");
+    await tokenRequest({
+      grant_type: "authorization_code", code: p.get("code"),
+      redirect_uri: REDIRECT_URI, code_verifier: store.get("ad_verifier") || "",
+    });
+    store.del("ad_verifier");
+  }
+
+  // ---------- Spotify playlist fetch ----------
+  function parsePlaylistId(input) {
+    const s = input.trim();
+    const m = s.match(/playlist[/:]([A-Za-z0-9]{22})/);
+    if (m) return m[1];
+    if (/^[A-Za-z0-9]{22}$/.test(s)) return s;
+    return null;
+  }
+
+  async function api(url) {
+    const res = await fetch(url, { headers: { Authorization: "Bearer " + token() } });
+    if (res.status === 401) { store.del("ad_token"); throw new Error("Spotify session expired — press Scan again to reconnect."); }
+    if (res.status === 404) throw new Error("Playlist not found. Spotify-made playlists (e.g. “Today's Top Hits”, Daily Mix) can't be read by apps — try one made by a user, or copy it into your own playlist.");
+    if (res.status === 403) throw new Error("Spotify refused access (403). Make sure your Spotify account is added under “User Management” in your developer app.");
+    if (!res.ok) throw new Error("Spotify error " + res.status);
+    return res.json();
+  }
+
+  async function fetchPlaylist(id) {
+    const meta = await api(`https://api.spotify.com/v1/playlists/${id}?fields=name`);
+    const out = [];
+    // Spotify is moving from /tracks to /items; try the newer endpoint first.
+    let url = `https://api.spotify.com/v1/playlists/${id}/items?limit=100&additional_types=track`;
+    let first = true;
+    while (url) {
+      $("load-err").style.color = "var(--muted)";
+      $("load-err").textContent = `Scanning… ${out.length} songs`;
+      let page;
+      try { page = await api(url); }
+      catch (e) {
+        if (!first) throw e;
+        page = await api(`https://api.spotify.com/v1/playlists/${id}/tracks?limit=100&additional_types=track`);
+      }
+      first = false;
+      for (const it of page.items || []) {
+        const t = it.track || it.item;
+        if (!t || t.type === "episode" || !t.artists?.length) continue;
+        out.push({
+          id: t.id || `local-${out.length}`,
+          title: t.name || "Unknown",
+          artists: t.artists.map((a) => a.name).filter(Boolean),
+          art: t.album?.images?.slice(-2)[0]?.url || t.album?.images?.[0]?.url || "",
+          uri: t.id && !t.is_local ? t.id : null,
+        });
+      }
+      url = page.next;
+    }
+    return { name: meta.name || "Playlist", songs: out };
+  }
+
+  async function scan() {
+    const err = $("load-err");
+    err.style.color = ""; err.textContent = "";
+    const raw = $("playlist-url").value;
+    const id = parsePlaylistId(raw);
+    if (!id) { err.textContent = "That doesn't look like a Spotify playlist link."; return; }
+    store.set("ad_pending", raw);
+    $("load-btn").disabled = true;
+    try {
+      if (!(await ensureToken())) { await login(); return; }
+      const pl = await fetchPlaylist(id);
+      store.del("ad_pending");
+      if (!pl.songs.length) throw new Error("No playable songs found in that playlist.");
+      startPick(pl.name, pl.songs);
+      err.textContent = "";
+    } catch (e) {
+      err.style.color = ""; err.textContent = e.message;
+    } finally {
+      $("load-btn").disabled = false;
+    }
+  }
+  $("load-btn").onclick = scan;
+  $("playlist-url").onkeydown = (e) => { if (e.key === "Enter") scan(); };
+
+  // ---------- manual input ----------
+  $("manual-btn").onclick = () => {
+    const list = [];
+    $("manual").value.split("\n").forEach((line, i) => {
+      line = line.trim();
+      if (!line) return;
+      const idx = line.indexOf(" - ");
+      const artistPart = idx >= 0 ? line.slice(0, idx) : line;
+      const title = idx >= 0 ? line.slice(idx + 3).trim() : `Song ${i + 1}`;
+      const artists = artistPart.split(/,|&| feat\.? | ft\.? | x /i).map((a) => a.trim()).filter(Boolean);
+      if (artists.length) list.push({ id: "m" + i, title, artists, art: "", uri: null });
+    });
+    if (list.length < 2) { $("manual-err").textContent = "Add at least 2 songs."; return; }
+    $("manual-err").textContent = "";
+    startPick("Your songs", list);
+  };
+
+  // ---------- pick artist ----------
+  function artistCounts() {
+    const map = new Map();
+    for (const s of songs) for (const a of new Set(s.artists)) map.set(a, (map.get(a) || 0) + 1);
+    return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }
+
+  function startPick(name, list) {
+    songs = list; playlistName = name; chosenArtist = null;
+    const counts = artistCounts();
+    $("pl-name").textContent = playlistName;
+    $("pl-stats").textContent = `${songs.length} songs · ${counts.length} artists — pick the one you want to avoid.`;
+    $("artist-search").value = "";
+    $("target-panel").classList.add("hidden");
+    renderArtists();
+    show("step-pick");
+  }
+
+  function renderArtists() {
+    const q = $("artist-search").value.trim().toLowerCase();
+    $("artists").innerHTML = artistCounts()
+      .filter(([a]) => !q || a.toLowerCase().includes(q))
+      .map(([a, n]) => `<button class="artist${a === chosenArtist ? " on" : ""}" data-a="${esc(a)}">${esc(a)}<small>${n} song${n > 1 ? "s" : ""}</small></button>`)
+      .join("") || `<p class="hint">No artists match.</p>`;
+  }
+  $("artist-search").oninput = renderArtists;
+  $("artists").onclick = (e) => {
+    const b = e.target.closest(".artist");
+    if (!b) return;
+    chosenArtist = b.dataset.a;
+    renderArtists();
+    setupTarget();
+  };
+
+  const hasArtist = (s) => s.artists.includes(chosenArtist);
+
+  function setupTarget() {
+    const hits = songs.filter(hasArtist).length;
+    const safe = songs.length - hits;
+    $("chosen-name").textContent = chosenArtist;
+    const r = $("target");
+    r.max = Math.max(1, safe);
+    r.value = Math.min(Number(r.value) || 5, safe || 1);
+    r.disabled = safe === 0;
+    $("play-btn").disabled = safe === 0;
+    updateOdds();
+    $("target-panel").classList.remove("hidden");
+    $("target-panel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function winChance(n, k, g) {
+    let p = 1;
+    for (let i = 0; i < g; i++) p *= (n - k - i) / (n - i);
+    return Math.max(0, p);
+  }
+
+  function updateOdds() {
+    const g = Number($("target").value);
+    const hits = songs.filter(hasArtist).length;
+    $("target-val").textContent = g;
+    if (hits === songs.length) { $("odds").textContent = "Every song has this artist — pick someone else!"; return; }
+    const p = winChance(songs.length, hits, g) * 100;
+    const pct = p >= 1 ? p.toFixed(1) : p.toPrecision(2);
+    $("odds").textContent = `${hits} of ${songs.length} songs feature ${chosenArtist}. Chance to survive ${g} song${g > 1 ? "s" : ""}: ${pct}%`;
+  }
+  $("target").oninput = updateOdds;
+  $("back-load").onclick = () => show("step-load");
+
+  // ---------- game ----------
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function startGame() {
+    game = { deck: shuffle(songs.slice()), pos: 0, target: Number($("target").value), survived: 0, over: false, history: [] };
+    $("g-artist").textContent = chosenArtist;
+    $("banner").classList.add("hidden");
+    $("song").innerHTML = "";
+    $("embed").innerHTML = "";
+    $("history").innerHTML = "";
+    $("next-btn").classList.remove("hidden");
+    $("again-btn").classList.add("hidden");
+    show("step-game");
+    nextSong();
+  }
+
+  function nextSong() {
+    if (!game || game.over) return;
+    const s = game.deck[game.pos++];
+    const hit = hasArtist(s);
+    if (!hit) game.survived++;
+    game.history.push({ s, hit });
+
+    $("song").innerHTML = `
+      ${s.art ? `<img src="${esc(s.art)}" alt="">` : `<div class="noart"></div>`}
+      <div>
+        <div class="hint">Song ${game.pos}</div>
+        <div class="title">${esc(s.title)}</div>
+        <div class="by">${s.artists.map((a) => a === chosenArtist ? `<b>${esc(a)}</b>` : esc(a)).join(", ")}</div>
+      </div>`;
+    renderEmbed(s);
+
+    const li = document.createElement("li");
+    li.className = hit ? "hit" : "";
+    li.textContent = `${game.pos}. ${s.title} — ${s.artists.join(", ")}`;
+    $("history").prepend(li);
+
+    $("g-count").textContent = `${game.survived} / ${game.target} survived`;
+    $("g-bar").style.width = Math.min(100, (game.survived / game.target) * 100) + "%";
+
+    if (hit) end(false);
+    else if (game.survived >= game.target) end(true);
+  }
+
+  function end(won) {
+    game.over = true;
+    const b = $("banner");
+    b.className = "banner " + (won ? "win" : "lose");
+    b.innerHTML = won
+      ? `<div class="big">You win! 🎉</div><div>You dodged ${esc(chosenArtist)} for ${game.target} song${game.target > 1 ? "s" : ""}.</div>`
+      : `<div class="big">${esc(chosenArtist)} got you 💀</div><div>Out on song ${game.pos} — you survived ${game.survived} of ${game.target}.</div>`;
+    $("next-btn").classList.add("hidden");
+    $("again-btn").classList.remove("hidden");
+  }
+
+  function renderEmbed(s) {
+    const on = $("embed-toggle").checked && s.uri;
+    $("embed").innerHTML = on
+      ? `<iframe src="https://open.spotify.com/embed/track/${encodeURIComponent(s.uri)}?utm_source=generator&theme=0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`
+      : "";
+  }
+  $("embed-toggle").onchange = () => { if (game?.pos) renderEmbed(game.deck[game.pos - 1]); };
+
+  $("play-btn").onclick = startGame;
+  $("next-btn").onclick = nextSong;
+  $("again-btn").onclick = startGame;
+  $("change-btn").onclick = () => { renderArtists(); show("step-pick"); };
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" && !$("step-game").classList.contains("hidden") && game && !game.over) nextSong();
+  });
+
+  // ---------- boot ----------
+  (async () => {
+    const pending = store.get("ad_pending");
+    if (pending) $("playlist-url").value = pending;
+    try {
+      await handleRedirect();
+    } catch (e) {
+      $("load-err").textContent = e.message;
+      refreshStatus();
+      return;
+    }
+    refreshStatus();
+    if (pending && token()) scan();
+  })();
+})();
+</script>
+</body>
+</html>
