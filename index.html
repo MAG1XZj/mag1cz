@@ -53,9 +53,12 @@
 
   .progress { height: 10px; background: var(--panel2); border-radius: 999px; overflow: hidden; margin: 8px 0 20px; }
   .progress div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
-  .song { display: flex; gap: 16px; align-items: center; }
-  .song img, .song .noart { width: 96px; height: 96px; border-radius: 8px; object-fit: cover; background: var(--panel2); flex: none; }
-  .song .title { font-size: 20px; font-weight: 700; }
+  .song { text-align: center; }
+  .cover { display: block; width: 100%; max-width: 320px; aspect-ratio: 1; margin: 0 auto 16px; border-radius: 12px; object-fit: cover;
+    background: linear-gradient(135deg, #2a2f36, #15171a); box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+  .cover.hit { outline: 4px solid var(--danger); }
+  .noart { display: flex; align-items: center; justify-content: center; font-size: 72px; color: #3b4048; }
+  .song .title { font-size: 22px; font-weight: 700; }
   .song .by { color: var(--muted); }
   .song .by b { color: var(--danger); }
   .embed { margin-top: 16px; }
@@ -65,9 +68,12 @@
   .banner.lose { background: #3a1419; border: 1px solid var(--danger); }
   .banner .big { font-size: 34px; }
   .history { list-style: none; padding: 0; margin: 0; font-size: 14px; }
-  .history li { padding: 6px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .history li { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .thumb { display: block; width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex: none; background: var(--panel2); }
+  .artist { display: flex; gap: 10px; align-items: center; }
+  .artist .thumb { width: 44px; height: 44px; }
   .history li.hit { color: var(--danger); font-weight: 600; }
-  @media (max-width: 480px) { .song img, .song .noart { width: 72px; height: 72px; } .big { font-size: 32px; } }
+  @media (max-width: 480px) { .cover { max-width: 240px; } .big { font-size: 32px; } }
 </style>
 </head>
 <body>
@@ -179,7 +185,7 @@
   const REDIRECT_URI = location.origin + location.pathname;
   const SCOPES = "playlist-read-private playlist-read-collaborative";
 
-  // Songs: [{ id, title, artists: [name], art, uri }]
+  // Songs: [{ id, title, artists: [name], art (large cover), thumb (small cover), uri }]
   let songs = [];
   let playlistName = "";
   let chosenArtist = null;
@@ -313,7 +319,9 @@
           id: t.id || `local-${out.length}`,
           title: t.name || "Unknown",
           artists: t.artists.map((a) => a.name).filter(Boolean),
-          art: t.album?.images?.slice(-2)[0]?.url || t.album?.images?.[0]?.url || "",
+          // Spotify lists album images largest first (640, 300, 64).
+          art: t.album?.images?.[0]?.url || "",
+          thumb: t.album?.images?.at(-1)?.url || t.album?.images?.[0]?.url || "",
           uri: t.id && !t.is_local ? t.id : null,
         });
       }
@@ -356,12 +364,35 @@
       const artistPart = idx >= 0 ? line.slice(0, idx) : line;
       const title = idx >= 0 ? line.slice(idx + 3).trim() : `Song ${i + 1}`;
       const artists = artistPart.split(/,|&| feat\.? | ft\.? | x /i).map((a) => a.trim()).filter(Boolean);
-      if (artists.length) list.push({ id: "m" + i, title, artists, art: "", uri: null });
+      if (artists.length) list.push({ id: "m" + i, title, artists, art: "", thumb: "", uri: null });
     });
     if (list.length < 2) { $("manual-err").textContent = "Add at least 2 songs."; return; }
     $("manual-err").textContent = "";
     startPick("Your songs", list);
+    findCovers(list);
   };
+
+  // Pasted songs have no cover, so look them up on the iTunes Search API (free, no login).
+  async function lookupCover(s) {
+    if (s.art || s.coverTried) return;
+    s.coverTried = true;
+    try {
+      const term = encodeURIComponent(`${s.artists[0]} ${s.title.startsWith("Song ") ? "" : s.title}`.trim());
+      const res = await fetch(`https://itunes.apple.com/search?term=${term}&entity=song&limit=1`);
+      const url = (await res.json()).results?.[0]?.artworkUrl100;
+      if (url) { s.art = url.replace("100x100bb", "600x600bb"); s.thumb = url; }
+    } catch {}
+  }
+  async function findCovers(list) {
+    const queue = list.slice();
+    const worker = async () => {
+      while (queue.length) {
+        await lookupCover(queue.shift());
+        if (!$("step-pick").classList.contains("hidden")) renderArtists();
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+  }
 
   // ---------- pick artist ----------
   function artistCounts() {
@@ -369,6 +400,12 @@
     for (const s of songs) for (const a of new Set(s.artists)) map.set(a, (map.get(a) || 0) + 1);
     return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }
+  // An artist's picture: the cover of their first song in the playlist that has one.
+  function artistThumb(name) {
+    const s = songs.find((x) => x.thumb && x.artists.includes(name));
+    return s ? s.thumb : "";
+  }
+  const thumbHtml = (url) => url ? `<img class="thumb" src="${esc(url)}" alt="" loading="lazy">` : `<span class="thumb"></span>`;
 
   function startPick(name, list) {
     songs = list; playlistName = name; chosenArtist = null;
@@ -385,7 +422,7 @@
     const q = $("artist-search").value.trim().toLowerCase();
     $("artists").innerHTML = artistCounts()
       .filter(([a]) => !q || a.toLowerCase().includes(q))
-      .map(([a, n]) => `<button class="artist${a === chosenArtist ? " on" : ""}" data-a="${esc(a)}">${esc(a)}<small>${n} song${n > 1 ? "s" : ""}</small></button>`)
+      .map(([a, n]) => `<button class="artist${a === chosenArtist ? " on" : ""}" data-a="${esc(a)}">${thumbHtml(artistThumb(a))}<span>${esc(a)}<small>${n} song${n > 1 ? "s" : ""}</small></span></button>`)
       .join("") || `<p class="hint">No artists match.</p>`;
   }
   $("artist-search").oninput = renderArtists;
@@ -453,15 +490,16 @@
     nextSong();
   }
 
-  function nextSong() {
-    if (!game || game.over) return;
+  async function nextSong() {
+    if (!game || game.over || game.busy) return;
     const s = game.deck[game.pos++];
+    if (!s.art && !s.coverTried) { game.busy = true; await lookupCover(s); game.busy = false; }
     const hit = hasArtist(s);
     if (!hit) game.survived++;
     game.history.push({ s, hit });
 
     $("song").innerHTML = `
-      ${s.art ? `<img src="${esc(s.art)}" alt="">` : `<div class="noart"></div>`}
+      ${s.art ? `<img class="cover${hit ? " hit" : ""}" src="${esc(s.art)}" alt="Cover of ${esc(s.title)}">` : `<div class="cover noart${hit ? " hit" : ""}">♪</div>`}
       <div>
         <div class="hint">Song ${game.pos}</div>
         <div class="title">${esc(s.title)}</div>
@@ -471,7 +509,7 @@
 
     const li = document.createElement("li");
     li.className = hit ? "hit" : "";
-    li.textContent = `${game.pos}. ${s.title} — ${s.artists.join(", ")}`;
+    li.innerHTML = `${thumbHtml(s.thumb)}<span>${game.pos}. ${esc(s.title)} — ${esc(s.artists.join(", "))}</span>`;
     $("history").prepend(li);
 
     $("g-count").textContent = `${game.survived} / ${game.target} survived`;
