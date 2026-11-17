@@ -1,44 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
   <title id="title">Sleeping cat</title>
-  <!-- Badge -->
-  <circle cx="256" cy="256" r="248" fill="#1E2340"/>
-  <!-- Moon -->
-  <path d="M392 92a58 58 0 1 0 42 98a48 48 0 1 1-42-98z" fill="#F6D58E"/>
-  <!-- Zzz -->
-  <g fill="none" stroke="#F6D58E" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M268 132h30l-30 32h30"/>
-    <path d="M318 98h20l-20 22h20" stroke-width="8" opacity=".8"/>
+  <defs>
+    <mask id="cut">
+      <rect width="512" height="512" fill="#fff"/>
+      <g fill="none" stroke="#000" stroke-linecap="round">
+        <!-- tail gap -->
+        <path d="M416 336c0 40-26 56-80 56H176" stroke-width="44"/>
+        <!-- closed eyes -->
+        <path d="M134 300q14 12 28 0M190 300q14 12 28 0" stroke-width="10"/>
+      </g>
+    </mask>
+  </defs>
+  <g fill="#1E2340">
+    <!-- body + head + ears, cut by mask -->
+    <path mask="url(#cut)" d="M96 380c-14-40-10-90 14-122l-6-74 54 42c18-6 38-8 58-6l42-50 10 70c80 6 148 70 148 140H96z"/>
+    <!-- tail -->
+    <path d="M416 336c0 40-26 56-80 56H176" fill="none" stroke="#1E2340" stroke-width="22" stroke-linecap="round"/>
+    <!-- z -->
+    <path d="M330 128h44l-44 46h44" fill="none" stroke="#1E2340" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <!-- Cat -->
-  <g fill="#F2EEE6">
-    <!-- body -->
-    <path d="M120 360c0-86 74-150 168-150s152 58 152 128c0 34-18 58-50 62H160c-26 0-40-16-40-40z"/>
-    <!-- ears -->
-    <path d="M118 262l8-62 46 40z"/>
-    <path d="M196 236l34-50 14 64z"/>
-    <!-- head -->
-    <ellipse cx="176" cy="318" rx="86" ry="74"/>
-  </g>
-  <!-- inner ears -->
-  <g fill="#E9A4A0">
-    <path d="M130 248l5-30 22 20z"/>
-    <path d="M208 236l17-24 7 30z"/>
-  </g>
-  <!-- tail wrapping around front -->
-  <g fill="none" stroke-linecap="round">
-    <path d="M430 352c8 50-30 64-96 64H204c-26 0-42-8-42-22" stroke="#1E2340" stroke-width="40"/>
-    <path d="M430 352c8 50-30 64-96 64H204c-26 0-42-8-42-22" stroke="#F2EEE6" stroke-width="30"/>
-  </g>
-  <!-- face -->
-  <g fill="none" stroke="#1E2340" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M128 316q14 12 28 0"/>
-    <path d="M190 316q14 12 28 0"/>
-    <path d="M166 342l7 6 7-6"/>
-  </g>
-  <g fill="none" stroke="#1E2340" stroke-width="3" stroke-linecap="round" opacity=".55">
-    <path d="M118 346l-34-4M118 356l-32 6"/>
-    <path d="M228 346l34-4M228 356l32 6"/>
-  </g>
-  <circle cx="139" cy="338" r="8" fill="#E9A4A0" opacity=".6"/>
-  <circle cx="207" cy="338" r="8" fill="#E9A4A0" opacity=".6"/>
 </svg>
