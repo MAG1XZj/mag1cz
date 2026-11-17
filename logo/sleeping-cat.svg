@@ -16,7 +16,10 @@
     <path mask="url(#cut)" d="M96 380c-14-40-10-90 14-122l-6-74 54 42c18-6 38-8 58-6l42-50 10 70c80 6 148 70 148 140H96z"/>
     <!-- tail -->
     <path d="M416 336c0 40-26 56-80 56H176" fill="none" stroke="#1E2340" stroke-width="22" stroke-linecap="round"/>
-    <!-- z -->
-    <path d="M330 128h44l-44 46h44" fill="none" stroke="#1E2340" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- zz -->
+    <g fill="none" stroke="#1E2340" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M318 140h44l-44 46h44" stroke-width="14"/>
+      <path d="M386 92h28l-28 30h28" stroke-width="10"/>
+    </g>
   </g>
 </svg>
